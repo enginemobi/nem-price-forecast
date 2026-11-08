@@ -7,6 +7,6 @@ Probabilistic short-term spot price forecasts for the Australian National Electr
 - **Storage:** DuckDB + Parquet
 - **App:** FastAPI + a React dashboard, built to run on your own machine first
 
-Status: planning. See [docs/PLAN.md](docs/PLAN.md).
+Status: phase 0 (feasibility spike) done; see [docs/phase0_results.md](docs/phase0_results.md). Plan: [docs/PLAN.md](docs/PLAN.md).
 
 For personal research use. Timestral weights are under Mistral AI's Modified MIT licence. NEM data © AEMO.
