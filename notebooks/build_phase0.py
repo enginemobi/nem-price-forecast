@@ -24,15 +24,23 @@ cells = [
         "bench = pd.DataFrame(json.loads((R / 'bench.json').read_text()))\n"
         "bench.pivot_table(index=['case', 'symmetric'], columns='model', values='seconds')"
     ),
-    nbf.v4.new_markdown_cell("## DA-30: all models and modes, all regions"),
+    nbf.v4.new_markdown_cell(
+        "## DA-30: all models and modes, all regions\n\n"
+        "28M ran on all 31 days; 209M on every 2nd day to save CPU, so the second table compares on those days only."
+    ),
     nbf.v4.new_code_cell(
         "da = pd.concat([pd.read_parquet(p) for p in sorted(R.glob('da30_*.parquet'))], ignore_index=True)\n"
         "pts = ['aemo_pd', 'naive_day', 'naive_week']\n"
-        "score(da, pts, ['model', 'mode'])"
+        "score(da[da['model'] == '28M'], pts, ['model', 'mode'])"
+    ),
+    nbf.v4.new_code_cell(
+        "common = set(da.loc[da['model'] == '209M', 'issue'])\n"
+        "score(da[da['issue'].isin(common)], pts, ['model', 'mode'])"
     ),
     nbf.v4.new_markdown_cell("### DA-30 by region (best Timestral config vs baselines)"),
     nbf.v4.new_code_cell(
-        "s = score(da, pts, ['model', 'mode'])\nbest = s['timestral_pinball'].idxmin()\nprint('best:', best)\n"
+        "s = score(da[da['issue'].isin(common)], pts, ['model', 'mode'])\n"
+        "best = s['timestral_pinball'].idxmin()\nprint('best:', best)\n"
         "best_da = da[(da['model'] == best[0]) & (da['mode'] == best[1])]\n"
         "score(best_da, pts, ['region'])"
     ),

@@ -21,6 +21,7 @@ RESULTS = Path("data/results")
 QUANTILE_LEVELS = (0.01,) + tuple(round(0.05 * i, 2) for i in range(1, 20)) + (0.99,)  # Timestral's 21 knots
 Q_COLS = [f"q{int(round(q * 100)):02d}" for q in QUANTILE_LEVELS]
 PD_HISTORY_LEAD = pd.Timedelta(hours=12)
+PD_CLIP = 1000.0  # $/MWh; PD often shows cap prices a day ahead that never happen
 
 
 # ---------------------------------------------------------------- data
@@ -138,7 +139,8 @@ def run_day_ahead(
     """DA-30: issue on day D at `issue_hm`, score the next trading day (D+1 04:30 .. D+2 04:00).
 
     mode: "uni" (5 series x 1 variate), "multi" (1 series x 5 variates), "uni_pd" (uni + PD RRP as known covariate),
-    "uni_pd_rm" (uni_pd + PD reserve margin as a second known covariate).
+    "uni_pd_rm" (uni_pd + PD reserve margin as a second known covariate); "uni_pdc" / "uni_pdc_rm" are the same
+    with the PD price covariate clipped to +/-`PD_CLIP`.
     Known covariates use, over the context, the PD value issued `PD_HISTORY_LEAD` ahead, and over the horizon
     the latest PD run at issue time, so no actuals leak in.
     """
@@ -158,7 +160,7 @@ def run_day_ahead(
             q = forecast(fc, ctx[None], h, symmetric=symmetric)[0]
         else:
             if mode.startswith("uni_pd"):
-                cols = ["RRP", "RESERVE"] if mode == "uni_pd_rm" else ["RRP"]
+                cols = ["RRP", "RESERVE"] if mode.endswith("_rm") else ["RRP"]
                 known = np.stack(
                     [
                         np.concatenate(
@@ -172,6 +174,8 @@ def run_day_ahead(
                     ],
                     axis=1,
                 )  # (5, C, T + H)
+                if mode.startswith("uni_pdc"):
+                    known[:, 0] = np.clip(known[:, 0], -PD_CLIP, PD_CLIP)
             q = forecast(fc, ctx[:, None, :], h, known=known, symmetric=symmetric)[:, 0]
         frames = _quantile_frame(q, horizon_idx)
         naive_day = _same_time_last_known(p30, target_idx, last_known)
@@ -266,6 +270,7 @@ def score(df: pd.DataFrame, point_cols: list[str], by: list[str]) -> pd.DataFram
             ok = d[c].notna()
             err = d.loc[ok, c] - d.loc[ok, "actual"]
             row[f"{c}_mae"] = err.abs().mean()
+            row[f"{c}_medae"] = err.abs().median()
             row[f"{c}_rmse"] = np.sqrt((err**2).mean())
         out[key] = row
     res = pd.DataFrame.from_dict(out, orient="index")
@@ -283,6 +288,7 @@ def main() -> None:
     p.add_argument("--start", default="2026-10-01")
     p.add_argument("--end", default="2026-10-31")
     p.add_argument("--da-models", nargs="*", default=["28M", "123M", "209M"])
+    p.add_argument("--every-days", type=int, default=1, help="DA-30: use every n-th day (to save CPU)")
     p.add_argument("--da-modes", nargs="*", default=["uni", "multi", "uni_pd", "uni_pd_rm"])
     p.add_argument("--id-model", default="28M")
     p.add_argument("--id-every-hours", type=int, default=3)
@@ -303,7 +309,7 @@ def main() -> None:
             fc = load_model(size)
             for mode in args.da_modes:
                 t0 = time.perf_counter()
-                res = run_day_ahead(p30, pdf, hist, fc, days, mode)
+                res = run_day_ahead(p30, pdf, hist, fc, days[:: args.every_days], mode)
                 res.assign(model=size, mode=mode).to_parquet(RESULTS / f"da30_{size}_{mode}.parquet", index=False)
                 print(f"DA-30 {size} {mode}: {time.perf_counter() - t0:.0f}s", flush=True)
 
