@@ -284,7 +284,11 @@ def score(df: pd.DataFrame, point_cols: list[str], by: list[str]) -> pd.DataFram
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--mmsdm", default="/home/ubuntu/nemraw/dispatchprice_mmsdm.parquet")
+    p.add_argument(
+        "--mmsdm",
+        default=None,
+        help="optional MMSDM DISPATCHPRICE Parquet (e.g. from NEMOSIS) to extend price history for long context",
+    )
     p.add_argument("--start", default="2026-10-01")
     p.add_argument("--end", default="2026-10-31")
     p.add_argument("--da-models", nargs="*", default=["28M", "123M", "209M"])
