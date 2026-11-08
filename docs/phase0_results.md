@@ -1,6 +1,8 @@
 # Phase 0 results: zero-shot Timestral on NEM prices
 
-Backtest: **1–31 Oct 2026**, all 5 regions, no fine-tuning. Reproduce with `uv run python -m nemcast.phase0`
+Backtest: **1–31 Oct 2026**, all 5 regions, no fine-tuning. Reproduce with
+`uv run python -m nemcast.phase0 --mmsdm <MMSDM DISPATCHPRICE parquet>` (28M, all DA modes, ID-5) and
+`uv run python -m nemcast.phase0 --mmsdm <…> --skip-id --da-models 209M --da-modes uni uni_pdc --every-days 2`
 (see `notebooks/phase0_spike.ipynb`). Prices are $/MWh. MAE is dominated by a handful of spikes, so median
 absolute error (MedAE) is shown too. Pinball = mean pinball loss over Timestral's 21 quantiles (≈ CRPS).
 
