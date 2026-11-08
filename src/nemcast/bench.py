@@ -1,4 +1,4 @@
-"""CPU latency benchmark for Timestral model sizes on NEM-shaped inputs."""
+"""Latency benchmark for Timestral model sizes on NEM-shaped inputs."""
 
 from __future__ import annotations
 
@@ -20,12 +20,12 @@ CASES = {
 }
 
 
-def bench(sizes: list[str], repeats: int) -> list[dict]:
+def bench(sizes: list[str], repeats: int, device: str = "cpu") -> list[dict]:
     rng = np.random.default_rng(0)
     rows = []
     for size in sizes:
         t0 = time.perf_counter()
-        fc = TimestralForecaster.from_pretrained(f"mistralai/Timestral-{size}")
+        fc = TimestralForecaster.from_pretrained(f"mistralai/Timestral-{size}", device=device)
         load_s = time.perf_counter() - t0
         for case, (b, v, t, h) in CASES.items():
             ctx = rng.standard_normal((b, v, t)).cumsum(-1).astype(np.float32)
@@ -37,7 +37,7 @@ def bench(sizes: list[str], repeats: int) -> list[dict]:
                         s = time.perf_counter()
                         fc.forecast(ctx, prediction_length=h, symmetric_averaging=sym, clip_nonnegative=False)
                         times.append(time.perf_counter() - s)
-                row = {"model": size, "case": case, "symmetric": sym, "seconds": round(min(times), 2)}
+                row = {"model": size, "device": device, "case": case, "symmetric": sym, "seconds": round(min(times), 2)}
                 rows.append(row | {"load_s": round(load_s, 1)})
                 print(json.dumps(row), flush=True)
         del fc
@@ -48,10 +48,11 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--sizes", nargs="+", default=list(SIZES), choices=SIZES)
     p.add_argument("--repeats", type=int, default=2)
+    p.add_argument("--device", default="cpu", help="torch device, e.g. cpu, mps (Apple GPU) or cuda")
     p.add_argument("--out", default="data/results/bench.json")
     args = p.parse_args()
     print(f"torch threads: {torch.get_num_threads()}", flush=True)
-    rows = bench(args.sizes, args.repeats)
+    rows = bench(args.sizes, args.repeats, args.device)
     from pathlib import Path
 
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)

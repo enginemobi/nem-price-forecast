@@ -85,8 +85,8 @@ def pd_history(pdf: pd.DataFrame, lead: pd.Timedelta = PD_HISTORY_LEAD, col: str
 # ---------------------------------------------------------------- model
 
 
-def load_model(size: str) -> TimestralForecaster:
-    return TimestralForecaster.from_pretrained(f"mistralai/Timestral-{size}")
+def load_model(size: str, device: str = "cpu") -> TimestralForecaster:
+    return TimestralForecaster.from_pretrained(f"mistralai/Timestral-{size}", device=device)
 
 
 def forecast(
@@ -297,6 +297,7 @@ def main() -> None:
     p.add_argument("--id-model", default="28M")
     p.add_argument("--id-every-hours", type=int, default=3)
     p.add_argument("--id-symmetric", action="store_true")
+    p.add_argument("--device", default="cpu", help="torch device, e.g. cpu, mps (Apple GPU) or cuda")
     p.add_argument("--skip-da", action="store_true")
     p.add_argument("--skip-id", action="store_true")
     args = p.parse_args()
@@ -310,7 +311,7 @@ def main() -> None:
     if not args.skip_da:
         hist = {c: pd_history(pdf, col=c) for c in ("RRP", "RESERVE")}
         for size in args.da_models:
-            fc = load_model(size)
+            fc = load_model(size, args.device)
             for mode in args.da_modes:
                 t0 = time.perf_counter()
                 res = run_day_ahead(p30, pdf, hist, fc, days[:: args.every_days], mode)
@@ -319,7 +320,7 @@ def main() -> None:
 
     if not args.skip_id:
         p5min = load_p5min()
-        fc = load_model(args.id_model)
+        fc = load_model(args.id_model, args.device)
         issues = [
             ts
             for ts in pd.date_range(args.start, pd.Timestamp(args.end) + pd.Timedelta("23:55:00"), freq="5min")
